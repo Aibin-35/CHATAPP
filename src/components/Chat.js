@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase-config";
 import {
@@ -34,7 +33,7 @@ export const Chat = ({ room }) => {
     });
 
     return () => unsuscribe();
-  }, []);
+  }, [messagesRef, room]); // <-- FIXED: Added missing dependencies here
 
   const handleSubmit = async (event) => {
     event.preventDefault();
