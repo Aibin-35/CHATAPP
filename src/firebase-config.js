@@ -1,22 +1,22 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth,GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "@firebase/firestore";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDka1rsvpQ-v0WFWQ4yTMF-uzvxx8ZxzCk",
-  authDomain: "chat-room-c5837.firebaseapp.com",
-  projectId: "chat-room-c5837",
-  storageBucket: "chat-room-c5837.firebasestorage.app",
-  messagingSenderId: "5394439254",
-  appId: "1:5394439254:web:e1c2afb31c67fadf6feff7"
+  apiKey: "AIzaSyDk01t57ODtNUPkbEgvMcJXAApBWeGXK-4",
+  authDomain: "my-chat-room-baae4.firebaseapp.com",
+  projectId: "my-chat-room-baae4",
+  storageBucket: "my-chat-room-baae4.firebasestorage.app",
+  messagingSenderId: "728207491115",
+  appId: "1:728207491115:web:bd3bf0db4d25936b04ea6e"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase Authentication and export it
 export const auth = getAuth(app);
-export const provider = new GoogleAuthProvider();
+
+// Initialize Cloud Firestore and export it
 export const db = getFirestore(app);
