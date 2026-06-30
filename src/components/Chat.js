@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth } from "../firebase-config";
-import { collection, addDoc, where, serverTimestamp, onSnapshot, query, orderBy } from "firebase/firestore";
+// FIXED: Removed "orderBy" from this import so Firebase stops blocking the data
+import { collection, addDoc, where, serverTimestamp, onSnapshot, query } from "firebase/firestore"; 
 import "../styles/Chat.css";
 
 const messagesRef = collection(db, "messages");
@@ -11,15 +12,24 @@ export default function Chat({ room }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    // FIX 7: Guarantee the query is always lowercase so all devices find the same messages
     const safeRoom = room.toLowerCase();
-    const queryMessages = query(messagesRef, where("room", "==", safeRoom), orderBy("createdAt"));
+    
+    // THE FIX: We removed orderBy("createdAt") here. Firebase will now send the data immediately to ALL users without demanding an index.
+    const queryMessages = query(messagesRef, where("room", "==", safeRoom));
     
     const unsubscribe = onSnapshot(queryMessages, (snapshot) => {
       let tempMessages = [];
       snapshot.forEach((doc) => {
         tempMessages.push({ ...doc.data(), id: doc.id });
       });
+      
+      // THE FIX: We sort the messages locally in React in milliseconds. No database index required!
+      tempMessages.sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt ? b.createdAt.toMillis() : Date.now();
+        return timeA - timeB;
+      });
+
       setMessages(tempMessages);
     });
     
@@ -33,8 +43,6 @@ export default function Chat({ room }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (newMessage.trim() === "") return;
-    
-    // FIX 8: Prevent sending if Firebase hasn't locked in the user yet
     if (!auth.currentUser) return;
 
     await addDoc(messagesRef, {
@@ -42,7 +50,7 @@ export default function Chat({ room }) {
       createdAt: serverTimestamp(),
       user: auth.currentUser.displayName || "Unknown User",
       photo: auth.currentUser.photoURL || "",
-      room: room.toLowerCase(), // Force lowercase saving
+      room: room.toLowerCase(), 
     });
     setNewMessage("");
   };
