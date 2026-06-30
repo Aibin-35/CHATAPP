@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
-import Auth from "./components/Auth";
-import Chat from "./components/Chat";
+// Fixed: Using named imports with curly braces to match the repository's export structure
+import { Auth } from "./components/Auth";
+import Chat from "./components/Chat"; 
 import { AppWrapper } from "./components/AppWrapper";
 import Cookies from "universal-cookie";
 import "./App.css";
@@ -8,15 +9,16 @@ import "./App.css";
 const cookies = new Cookies();
 
 function App() {
-  // State to check if the user is authenticated via their cookie token
+  // State to track if the user is authenticated via their cookie token
   const [isAuth, setIsAuth] = useState(cookies.get("auth-token"));
-  // State to hold the current active chat room name
+  
+  // State to hold the current active chat room name input by the user
   const [room, setRoom] = useState(null);
 
-  // A reference to the input field where users type the room name
+  // Reference hook to grab the text value from the input field cleanly
   const roomInputRef = useRef(null);
 
-  // If the user isn't logged in, render the Auth component inside the wrapper
+  // Guard Clause: If the user is not authenticated, render the Auth login screen
   if (!isAuth) {
     return (
       <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
@@ -28,10 +30,10 @@ function App() {
   return (
     <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
       {room ? (
-        /* If a room is selected, pass the room name down as a prop to the Chat component */
+        /* UI Logic: If a room name exists in state, render that specific room's chat feed */
         <Chat room={room} />
       ) : (
-        /* If no room is selected yet, show the UI to enter or join a room */
+        /* UI Logic: If no room is active, render the welcome screen to create/join a room */
         <div className="room-container">
           <h2>Enter Room Name:</h2>
           <input 
