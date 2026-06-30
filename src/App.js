@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-// Fixed: Using named imports with curly braces to match the repository's export structure
 import { Auth } from "./components/Auth";
 import Chat from "./components/Chat"; 
 import { AppWrapper } from "./components/AppWrapper";
@@ -9,16 +8,10 @@ import "./App.css";
 const cookies = new Cookies();
 
 function App() {
-  // State to track if the user is authenticated via their cookie token
   const [isAuth, setIsAuth] = useState(cookies.get("auth-token"));
-  
-  // State to hold the current active chat room name input by the user
   const [room, setRoom] = useState(null);
-
-  // Reference hook to grab the text value from the input field cleanly
   const roomInputRef = useRef(null);
 
-  // Guard Clause: If the user is not authenticated, render the Auth login screen
   if (!isAuth) {
     return (
       <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
@@ -30,19 +23,24 @@ function App() {
   return (
     <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
       {room ? (
-        /* UI Logic: If a room name exists in state, render that specific room's chat feed */
-        <Chat room={room} />
+        /* Passing setRoom down to the Chat component so the user can click "Exit" to set the room back to null */
+        <Chat room={room} setRoom={setRoom} />
       ) : (
-        /* UI Logic: If no room is active, render the welcome screen to create/join a room */
+        /* Updated UI: Makes it clear to the user that this single input handles both creating and joining */
         <div className="room-container">
-          <h2>Enter Room Name:</h2>
+          <h2>Create or Join a Chat Room</h2>
+          <p>Type a room name below. If it exists, you will join it. If not, you will create a new one!</p>
           <input 
             type="text" 
-            placeholder="e.g., General, Coding, Sports..." 
+            placeholder="e.g., General, Project, Sports..." 
             ref={roomInputRef} 
           />
-          <button onClick={() => setRoom(roomInputRef.current.value.trim().toLowerCase())}>
-            Join Chat Room
+          <button onClick={() => {
+            // Grabs the input, removes extra spaces, and forces lowercase to prevent duplicate rooms like "General" and "general"
+            const enteredRoom = roomInputRef.current.value.trim().toLowerCase();
+            if (enteredRoom) setRoom(enteredRoom);
+          }}>
+            Enter Room
           </button>
         </div>
       )}
