@@ -9,41 +9,49 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-
 import "../styles/Chat.css";
 
-export const Chat = ({ room }) => {
+export default function Chat({ room }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesRef = collection(db, "messages");
 
+  // Effect hook to listen for real-time updates from Firestore
   useEffect(() => {
+    // Logic: Create a query that filters the 'messages' collection where the 'room' field matches our current active room prop.
+    // It also orders them by the timestamp so old messages stay at the top and new ones appear at the bottom.
     const queryMessages = query(
       messagesRef,
       where("room", "==", room),
       orderBy("createdAt")
     );
-    const unsuscribe = onSnapshot(queryMessages, (snapshot) => {
-      let messages = [];
+
+    // Set up the real-time listener
+    const unsubscribe = onSnapshot(queryMessages, (snapshot) => {
+      let tempMessages = [];
       snapshot.forEach((doc) => {
-        messages.push({ ...doc.data(), id: doc.id });
+        tempMessages.push({ ...doc.data(), id: doc.id });
       });
-      console.log(messages);
-      setMessages(messages);
+      setMessages(tempMessages);
     });
 
-    return () => unsuscribe();
-  }, [messagesRef, room]); // <-- FIXED: Added missing dependencies here
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, [room]);
 
+  // Handler function for submitting a new message
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (newMessage === "") return;
+    if (newMessage.trim() === "") return;
+
+    // Logic: Add a new document to the messages collection, saving the text, sender info, timestamp, AND the specific room name.
     await addDoc(messagesRef, {
       text: newMessage,
       createdAt: serverTimestamp(),
       user: auth.currentUser.displayName,
-      room,
+      photo: auth.currentUser.photoURL,
+      room: room, // Saves the room identifier
     });
 
     setNewMessage("");
@@ -52,20 +60,26 @@ export const Chat = ({ room }) => {
   return (
     <div className="chat-app">
       <div className="header">
-        <h1>Welcome to: {room.toUpperCase()}</h1>
+        <h1>Welcome to Room: <span className="room-title">{room.toUpperCase()}</span></h1>
       </div>
+      
       <div className="messages">
         {messages.map((message) => (
           <div key={message.id} className="message">
-            <span className="user">{message.user}:</span> {message.text}
+            <span className="user">
+              {message.photo && <img src={message.photo} alt="avatar" className="avatar" />}
+              <strong>{message.user}:</strong>
+            </span>
+            <p className="message-text">{message.text}</p>
           </div>
         ))}
       </div>
+
       <form onSubmit={handleSubmit} className="new-message-form">
         <input
           type="text"
           value={newMessage}
-          onChange={(event) => setNewMessage(event.target.value)}
+          onChange={(e) => setNewMessage(e.target.value)}
           className="new-message-input"
           placeholder="Type your message here..."
         />
@@ -75,4 +89,4 @@ export const Chat = ({ room }) => {
       </form>
     </div>
   );
-};
+}
