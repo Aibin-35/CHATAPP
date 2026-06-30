@@ -11,15 +11,16 @@ import {
 } from "firebase/firestore";
 import "../styles/Chat.css";
 
+// FIXED: Moved messagesRef OUTSIDE the component so it doesn't trigger the useEffect dependency warning
+const messagesRef = collection(db, "messages");
+
 export default function Chat({ room }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const messagesRef = collection(db, "messages");
 
   // Effect hook to listen for real-time updates from Firestore
   useEffect(() => {
-    // Logic: Create a query that filters the 'messages' collection where the 'room' field matches our current active room prop.
-    // It also orders them by the timestamp so old messages stay at the top and new ones appear at the bottom.
+    // Logic: Create a query that filters the 'messages' collection where the 'room' matches.
     const queryMessages = query(
       messagesRef,
       where("room", "==", room),
@@ -37,7 +38,7 @@ export default function Chat({ room }) {
 
     // Cleanup listener on unmount
     return () => unsubscribe();
-  }, [room]);
+  }, [room]); // React is now perfectly happy with just 'room' here!
 
   // Handler function for submitting a new message
   const handleSubmit = async (event) => {
@@ -45,13 +46,13 @@ export default function Chat({ room }) {
 
     if (newMessage.trim() === "") return;
 
-    // Logic: Add a new document to the messages collection, saving the text, sender info, timestamp, AND the specific room name.
+    // Logic: Add a new document to the messages collection
     await addDoc(messagesRef, {
       text: newMessage,
       createdAt: serverTimestamp(),
       user: auth.currentUser.displayName,
       photo: auth.currentUser.photoURL,
-      room: room, // Saves the room identifier
+      room: room, 
     });
 
     setNewMessage("");
