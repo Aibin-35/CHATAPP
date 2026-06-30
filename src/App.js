@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Auth } from "./components/Auth";
 import Chat from "./components/Chat"; 
 import Cookies from "universal-cookie";
 import { auth } from "./firebase-config";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import "./App.css";
 
 const cookies = new Cookies();
@@ -11,44 +11,60 @@ const cookies = new Cookies();
 export default function App() {
   const [isAuth, setIsAuth] = useState(cookies.get("auth-token"));
   
-  // Sets the default room that loads when you log in
-  const [room, setRoom] = useState("general"); 
-  
-  // State to handle the list of rooms in the sidebar
-  const [roomsList, setRoomsList] = useState(["General", "React", "JavaScript", "Projects", "Soso"]);
-  
-  // State for the text inside the "Create room" input
+  // FIX 1: Read from localStorage first so refreshing doesn't lose your room!
+  const [room, setRoom] = useState(localStorage.getItem("activeRoom") || "general"); 
+  const [roomsList, setRoomsList] = useState(["general", "react", "javascript", "projects", "soso"]);
   const [newRoom, setNewRoom] = useState("");
+  
+  // FIX 2: Create a state to wait for Firebase to load before rendering the UI
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-  // Logic: Handles the sign-out process and clears cookies
+  // FIX 3: Safely check auth state so the app doesn't crash on refresh
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsUserLoaded(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // FIX 4: Save the room to localStorage instantly every time you click a new room
+  useEffect(() => {
+    if (room) {
+      localStorage.setItem("activeRoom", room);
+    }
+  }, [room]);
+
   const handleLogout = async () => {
     await signOut(auth);
     cookies.remove("auth-token");
     setIsAuth(false);
-    setRoom(null);
+    setRoom("general");
+    localStorage.removeItem("activeRoom"); // Clear memory on logout
   };
 
-  // Logic: Adds a new room to the sidebar if it doesn't already exist, then automatically joins it
   const handleCreateRoom = () => {
-    const trimmedRoom = newRoom.trim();
+    // FIX 5: Force strict lowercase so phones and laptops always match exactly
+    const trimmedRoom = newRoom.trim().toLowerCase(); 
     if (trimmedRoom !== "") {
-      // Check if room already exists to prevent duplicates
-      const roomExists = roomsList.some(r => r.toLowerCase() === trimmedRoom.toLowerCase());
-      if (!roomExists) {
+      if (!roomsList.includes(trimmedRoom)) {
         setRoomsList([...roomsList, trimmedRoom]);
       }
-      setRoom(trimmedRoom.toLowerCase());
+      setRoom(trimmedRoom);
       setNewRoom("");
     }
   };
 
-  // Guard Clause: Render login screen if not authenticated
   if (!isAuth) {
     return (
       <div className="auth-wrapper">
         <Auth setIsAuth={setIsAuth} />
       </div>
     );
+  }
+
+  // FIX 6: Show a quick loading screen so the profile pic doesn't break the app
+  if (!isUserLoaded) {
+    return <div style={{ color: "white", display: "flex", justifyContent: "center", marginTop: "20vh" }}><h3>Loading chat securely...</h3></div>;
   }
 
   return (
@@ -58,7 +74,6 @@ export default function App() {
       <div className="sidebar">
         <h2 className="sidebar-title">Chat Rooms</h2>
         
-        {/* Create Room Input Area */}
         <div className="create-room-box">
           <input 
             type="text" 
@@ -70,21 +85,18 @@ export default function App() {
           <button onClick={handleCreateRoom} className="create-room-btn">+</button>
         </div>
 
-        {/* List of Available Rooms */}
         <div className="room-list">
           {roomsList.map((r) => (
             <div 
               key={r} 
-              // Highlights the room blue if it is currently active
-              className={`room-item ${room.toLowerCase() === r.toLowerCase() ? "active" : ""}`}
-              onClick={() => setRoom(r.toLowerCase())}
+              className={`room-item ${room === r ? "active" : ""}`}
+              onClick={() => setRoom(r)}
             >
-              # {r}
+              # {r.charAt(0).toUpperCase() + r.slice(1)}
             </div>
           ))}
         </div>
 
-        {/* User Profile Section at Bottom */}
         <div className="user-profile">
           {auth.currentUser?.photoURL && (
             <img src={auth.currentUser.photoURL} alt="Profile" className="profile-pic" />
