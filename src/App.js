@@ -1,51 +1,107 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Auth } from "./components/Auth";
 import Chat from "./components/Chat"; 
-import { AppWrapper } from "./components/AppWrapper";
 import Cookies from "universal-cookie";
+import { auth } from "./firebase-config";
+import { signOut } from "firebase/auth";
 import "./App.css";
 
 const cookies = new Cookies();
 
-function App() {
+export default function App() {
   const [isAuth, setIsAuth] = useState(cookies.get("auth-token"));
-  const [room, setRoom] = useState(null);
-  const roomInputRef = useRef(null);
+  
+  // Sets the default room that loads when you log in
+  const [room, setRoom] = useState("general"); 
+  
+  // State to handle the list of rooms in the sidebar
+  const [roomsList, setRoomsList] = useState(["General", "React", "JavaScript", "Projects", "Soso"]);
+  
+  // State for the text inside the "Create room" input
+  const [newRoom, setNewRoom] = useState("");
 
+  // Logic: Handles the sign-out process and clears cookies
+  const handleLogout = async () => {
+    await signOut(auth);
+    cookies.remove("auth-token");
+    setIsAuth(false);
+    setRoom(null);
+  };
+
+  // Logic: Adds a new room to the sidebar if it doesn't already exist, then automatically joins it
+  const handleCreateRoom = () => {
+    const trimmedRoom = newRoom.trim();
+    if (trimmedRoom !== "") {
+      // Check if room already exists to prevent duplicates
+      const roomExists = roomsList.some(r => r.toLowerCase() === trimmedRoom.toLowerCase());
+      if (!roomExists) {
+        setRoomsList([...roomsList, trimmedRoom]);
+      }
+      setRoom(trimmedRoom.toLowerCase());
+      setNewRoom("");
+    }
+  };
+
+  // Guard Clause: Render login screen if not authenticated
   if (!isAuth) {
     return (
-      <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
+      <div className="auth-wrapper">
         <Auth setIsAuth={setIsAuth} />
-      </AppWrapper>
+      </div>
     );
   }
 
   return (
-    <AppWrapper isAuth={isAuth} setIsAuth={setIsAuth} setIsInChat={!!room}>
-      {room ? (
-        /* Passing setRoom down to the Chat component so the user can click "Exit" to set the room back to null */
-        <Chat room={room} setRoom={setRoom} />
-      ) : (
-        /* Updated UI: Makes it clear to the user that this single input handles both creating and joining */
-        <div className="room-container">
-          <h2>Create or Join a Chat Room</h2>
-          <p>Type a room name below. If it exists, you will join it. If not, you will create a new one!</p>
+    <div className="app-layout">
+      
+      {/* LEFT COLUMN: Sidebar Navigation */}
+      <div className="sidebar">
+        <h2 className="sidebar-title">Chat Rooms</h2>
+        
+        {/* Create Room Input Area */}
+        <div className="create-room-box">
           <input 
             type="text" 
-            placeholder="e.g., General, Project, Sports..." 
-            ref={roomInputRef} 
+            placeholder="Create room" 
+            value={newRoom}
+            onChange={(e) => setNewRoom(e.target.value)}
+            className="create-room-input"
           />
-          <button onClick={() => {
-            // Grabs the input, removes extra spaces, and forces lowercase to prevent duplicate rooms like "General" and "general"
-            const enteredRoom = roomInputRef.current.value.trim().toLowerCase();
-            if (enteredRoom) setRoom(enteredRoom);
-          }}>
-            Enter Room
-          </button>
+          <button onClick={handleCreateRoom} className="create-room-btn">+</button>
         </div>
-      )}
-    </AppWrapper>
+
+        {/* List of Available Rooms */}
+        <div className="room-list">
+          {roomsList.map((r) => (
+            <div 
+              key={r} 
+              // Highlights the room blue if it is currently active
+              className={`room-item ${room.toLowerCase() === r.toLowerCase() ? "active" : ""}`}
+              onClick={() => setRoom(r.toLowerCase())}
+            >
+              # {r}
+            </div>
+          ))}
+        </div>
+
+        {/* User Profile Section at Bottom */}
+        <div className="user-profile">
+          {auth.currentUser?.photoURL && (
+            <img src={auth.currentUser.photoURL} alt="Profile" className="profile-pic" />
+          )}
+          <div className="profile-info">
+            <span className="profile-name">{auth.currentUser?.displayName || "User"}</span>
+            <span className="profile-email">{auth.currentUser?.email}</span>
+          </div>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: Active Chat Feed */}
+      <div className="main-chat-area">
+        <Chat room={room} />
+      </div>
+
+    </div>
   );
 }
-
-export default App;
