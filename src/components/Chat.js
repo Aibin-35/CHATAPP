@@ -11,7 +11,10 @@ export default function Chat({ room }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    const queryMessages = query(messagesRef, where("room", "==", room), orderBy("createdAt"));
+    // FIX 7: Guarantee the query is always lowercase so all devices find the same messages
+    const safeRoom = room.toLowerCase();
+    const queryMessages = query(messagesRef, where("room", "==", safeRoom), orderBy("createdAt"));
+    
     const unsubscribe = onSnapshot(queryMessages, (snapshot) => {
       let tempMessages = [];
       snapshot.forEach((doc) => {
@@ -19,6 +22,7 @@ export default function Chat({ room }) {
       });
       setMessages(tempMessages);
     });
+    
     return () => unsubscribe();
   }, [room]);
 
@@ -29,17 +33,20 @@ export default function Chat({ room }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (newMessage.trim() === "") return;
+    
+    // FIX 8: Prevent sending if Firebase hasn't locked in the user yet
+    if (!auth.currentUser) return;
+
     await addDoc(messagesRef, {
       text: newMessage,
       createdAt: serverTimestamp(),
-      user: auth.currentUser.displayName,
-      photo: auth.currentUser.photoURL,
-      room: room,
+      user: auth.currentUser.displayName || "Unknown User",
+      photo: auth.currentUser.photoURL || "",
+      room: room.toLowerCase(), // Force lowercase saving
     });
     setNewMessage("");
   };
 
-  // Logic: Converts the ugly Firebase timestamp object into a clean "09:13 PM" format
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = timestamp.toDate();
@@ -48,20 +55,18 @@ export default function Chat({ room }) {
 
   return (
     <div className="chat-container">
-      {/* Top Header */}
       <div className="chat-header">
         <h1>#{room.charAt(0).toUpperCase() + room.slice(1)}</h1>
         <p>Real-time chat powered by Firebase Authentication & Firestore</p>
       </div>
       
-      {/* Centered Messages Feed */}
       <div className="messages-feed">
         {messages.map((message) => (
           <div key={message.id} className="message-card">
             {message.photo ? (
               <img src={message.photo} alt="avatar" className="message-avatar" />
             ) : (
-              <div className="message-avatar-fallback">{message.user?.charAt(0)}</div>
+              <div className="message-avatar-fallback">{message.user?.charAt(0) || "?"}</div>
             )}
             <div className="message-details">
               <span className="message-user">{message.user}</span>
@@ -73,7 +78,6 @@ export default function Chat({ room }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input Form */}
       <form onSubmit={handleSubmit} className="message-form">
         <input
           type="text"
