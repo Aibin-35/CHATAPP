@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth } from "../firebase-config";
-// FIXED: Removed "orderBy" from this import so Firebase stops blocking the data
-import { collection, addDoc, where, serverTimestamp, onSnapshot, query } from "firebase/firestore"; 
+import { collection, addDoc, where, serverTimestamp, onSnapshot, query } from "firebase/firestore";
 import "../styles/Chat.css";
 
 const messagesRef = collection(db, "messages");
 
-export default function Chat({ room }) {
+export default function Chat({ activeRoom }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    const safeRoom = room.toLowerCase();
-    
-    // THE FIX: We removed orderBy("createdAt") here. Firebase will now send the data immediately to ALL users without demanding an index.
-    const queryMessages = query(messagesRef, where("room", "==", safeRoom));
+    if (!activeRoom) return;
+
+    // THE FIX: We removed orderBy() entirely. This prevents the silent Firebase index bug!
+    const queryMessages = query(messagesRef, where("roomId", "==", activeRoom.id));
     
     const unsubscribe = onSnapshot(queryMessages, (snapshot) => {
       let tempMessages = [];
@@ -23,7 +22,7 @@ export default function Chat({ room }) {
         tempMessages.push({ ...doc.data(), id: doc.id });
       });
       
-      // THE FIX: We sort the messages locally in React in milliseconds. No database index required!
+      // Sort messages locally in the browser to guarantee real-time sync across all devices
       tempMessages.sort((a, b) => {
         const timeA = a.createdAt ? a.createdAt.toMillis() : Date.now();
         const timeB = b.createdAt ? b.createdAt.toMillis() : Date.now();
@@ -34,38 +33,52 @@ export default function Chat({ room }) {
     });
     
     return () => unsubscribe();
-  }, [room]);
+  }, [activeRoom]);
 
+  // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (newMessage.trim() === "") return;
-    if (!auth.currentUser) return;
+    if (newMessage.trim() === "" || !auth.currentUser) return;
 
     await addDoc(messagesRef, {
       text: newMessage,
       createdAt: serverTimestamp(),
-      user: auth.currentUser.displayName || "Unknown User",
-      photo: auth.currentUser.photoURL || "",
-      room: room.toLowerCase(), 
+      user: auth.currentUser.displayName,
+      photo: auth.currentUser.photoURL,
+      roomId: activeRoom.id, 
     });
     setNewMessage("");
   };
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
-    const date = timestamp.toDate();
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Extract unique users who have chatted in this room for the "Participants" feature
+  const activeParticipants = [...new Set(messages.map(m => m.user))];
 
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h1>#{room.charAt(0).toUpperCase() + room.slice(1)}</h1>
-        <p>Real-time chat powered by Firebase Authentication & Firestore</p>
+        <div className="header-info">
+          <h1>#{activeRoom.name} {activeRoom.isPrivate && "🔒"}</h1>
+          <p className="room-meta">Created by {activeRoom.createdBy}</p>
+        </div>
+        
+        {activeRoom.isPrivate && (
+          <div className="invite-badge">
+            Invite Code: <strong>{activeRoom.inviteCode}</strong>
+          </div>
+        )}
+      </div>
+
+      <div className="participants-bar">
+        <span><strong>Active:</strong> {activeParticipants.length > 0 ? activeParticipants.join(", ") : "Just you so far!"}</span>
       </div>
       
       <div className="messages-feed">
@@ -74,7 +87,7 @@ export default function Chat({ room }) {
             {message.photo ? (
               <img src={message.photo} alt="avatar" className="message-avatar" />
             ) : (
-              <div className="message-avatar-fallback">{message.user?.charAt(0) || "?"}</div>
+              <div className="message-avatar-fallback">{message.user?.charAt(0)}</div>
             )}
             <div className="message-details">
               <span className="message-user">{message.user}</span>
@@ -91,7 +104,7 @@ export default function Chat({ room }) {
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder={`Message #${room}`}
+          placeholder={`Message #${activeRoom.name}`}
           className="message-input"
         />
         <button type="submit" className="send-btn">Send</button>
