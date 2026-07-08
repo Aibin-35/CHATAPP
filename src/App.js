@@ -2,118 +2,181 @@ import React, { useState, useEffect } from "react";
 import { Auth } from "./components/Auth";
 import Chat from "./components/Chat"; 
 import Cookies from "universal-cookie";
-import { auth } from "./firebase-config";
+import { db, auth } from "./firebase-config";
 import { signOut, onAuthStateChanged } from "firebase/auth";
+import { collection, addDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import "./App.css";
 
 const cookies = new Cookies();
+const roomsRef = collection(db, "rooms");
 
 export default function App() {
   const [isAuth, setIsAuth] = useState(cookies.get("auth-token"));
-  
-  // FIX 1: Read from localStorage first so refreshing doesn't lose your room!
-  const [room, setRoom] = useState(localStorage.getItem("activeRoom") || "general"); 
-  const [roomsList, setRoomsList] = useState(["general", "react", "javascript", "projects", "soso"]);
-  const [newRoom, setNewRoom] = useState("");
-  
-  // FIX 2: Create a state to wait for Firebase to load before rendering the UI
   const [isUserLoaded, setIsUserLoaded] = useState(false);
+  
+  // Advanced State for Rooms
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  
+  // UI State for Creating/Joining
+  const [newRoomName, setNewRoomName] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
 
-  // FIX 3: Safely check auth state so the app doesn't crash on refresh
+  // 1. Wait for Firebase Auth to load securely
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsUserLoaded(true);
+      if (user) {
+        // Try to load the last visited room from local memory
+        const savedRoom = localStorage.getItem("activeRoom");
+        if (savedRoom) setActiveRoom(JSON.parse(savedRoom));
+      }
     });
     return () => unsubscribe();
   }, []);
 
-  // FIX 4: Save the room to localStorage instantly every time you click a new room
+  // 2. Fetch all rooms from Firebase globally (No indexes required!)
   useEffect(() => {
-    if (room) {
-      localStorage.setItem("activeRoom", room);
+    if (!isAuth) return;
+    const unsubscribe = onSnapshot(roomsRef, (snapshot) => {
+      const fetchedRooms = [];
+      snapshot.forEach((doc) => {
+        fetchedRooms.push({ id: doc.id, ...doc.data() });
+      });
+      setRooms(fetchedRooms);
+    });
+    return () => unsubscribe();
+  }, [isAuth]);
+
+  // 3. Save active room to local storage so refreshes don't break the UI
+  useEffect(() => {
+    if (activeRoom) {
+      localStorage.setItem("activeRoom", JSON.stringify(activeRoom));
     }
-  }, [room]);
+  }, [activeRoom]);
 
   const handleLogout = async () => {
     await signOut(auth);
     cookies.remove("auth-token");
     setIsAuth(false);
-    setRoom("general");
-    localStorage.removeItem("activeRoom"); // Clear memory on logout
+    setActiveRoom(null);
+    localStorage.removeItem("activeRoom");
   };
 
-  const handleCreateRoom = () => {
-    // FIX 5: Force strict lowercase so phones and laptops always match exactly
-    const trimmedRoom = newRoom.trim().toLowerCase(); 
-    if (trimmedRoom !== "") {
-      if (!roomsList.includes(trimmedRoom)) {
-        setRoomsList([...roomsList, trimmedRoom]);
-      }
-      setRoom(trimmedRoom);
-      setNewRoom("");
+  const createRoom = async () => {
+    if (newRoomName.trim() === "") return;
+    
+    // Generate a 6-character random invite code if private
+    const inviteCode = isPrivate ? Math.random().toString(36).substring(2, 8).toUpperCase() : null;
+
+    const newRoomData = {
+      name: newRoomName.trim(),
+      isPrivate: isPrivate,
+      inviteCode: inviteCode,
+      createdBy: auth.currentUser.displayName || "Unknown",
+      createdAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(roomsRef, newRoomData);
+    const createdRoom = { id: docRef.id, ...newRoomData };
+    
+    setActiveRoom(createdRoom);
+    setNewRoomName("");
+    setIsPrivate(false);
+  };
+
+  const joinPrivateRoom = () => {
+    const roomToJoin = rooms.find(r => r.inviteCode === joinCode.trim().toUpperCase());
+    if (roomToJoin) {
+      setActiveRoom(roomToJoin);
+      setJoinCode("");
+    } else {
+      alert("Invalid Invite Code!");
     }
   };
 
   if (!isAuth) {
-    return (
-      <div className="auth-wrapper">
-        <Auth setIsAuth={setIsAuth} />
-      </div>
-    );
+    return <div className="auth-wrapper"><Auth setIsAuth={setIsAuth} /></div>;
   }
 
-  // FIX 6: Show a quick loading screen so the profile pic doesn't break the app
-  if (!isUserLoaded) {
-    return <div style={{ color: "white", display: "flex", justifyContent: "center", marginTop: "20vh" }}><h3>Loading chat securely...</h3></div>;
-  }
+  if (!isUserLoaded) return <h2 style={{color: "white", textAlign: "center", marginTop: "20vh"}}>Loading Secure Chat...</h2>;
 
   return (
     <div className="app-layout">
-      
-      {/* LEFT COLUMN: Sidebar Navigation */}
+      {/* SIDEBAR */}
       <div className="sidebar">
-        <h2 className="sidebar-title">Chat Rooms</h2>
+        <h2 className="sidebar-title">Server Hub</h2>
         
-        <div className="create-room-box">
+        {/* CREATE ROOM UI */}
+        <div className="sidebar-section">
+          <h3>Create a Room</h3>
           <input 
             type="text" 
-            placeholder="Create room" 
-            value={newRoom}
-            onChange={(e) => setNewRoom(e.target.value)}
-            className="create-room-input"
+            placeholder="Room Name" 
+            value={newRoomName}
+            onChange={(e) => setNewRoomName(e.target.value)}
+            className="ui-input"
           />
-          <button onClick={handleCreateRoom} className="create-room-btn">+</button>
+          <label className="checkbox-label">
+            <input 
+              type="checkbox" 
+              checked={isPrivate} 
+              onChange={(e) => setIsPrivate(e.target.checked)} 
+            /> Make Private
+          </label>
+          <button onClick={createRoom} className="ui-btn create-btn">Create</button>
         </div>
 
+        {/* JOIN PRIVATE ROOM UI */}
+        <div className="sidebar-section">
+          <h3>Join Private Room</h3>
+          <div className="flex-row">
+            <input 
+              type="text" 
+              placeholder="Invite Code" 
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              className="ui-input short-input"
+            />
+            <button onClick={joinPrivateRoom} className="ui-btn join-btn">Join</button>
+          </div>
+        </div>
+
+        {/* PUBLIC ROOMS LIST */}
         <div className="room-list">
-          {roomsList.map((r) => (
+          <h3>Public Rooms</h3>
+          {rooms.filter(r => !r.isPrivate).map((r) => (
             <div 
-              key={r} 
-              className={`room-item ${room === r ? "active" : ""}`}
-              onClick={() => setRoom(r)}
+              key={r.id} 
+              className={`room-item ${activeRoom?.id === r.id ? "active" : ""}`}
+              onClick={() => setActiveRoom(r)}
             >
-              # {r.charAt(0).toUpperCase() + r.slice(1)}
+              # {r.name}
             </div>
           ))}
         </div>
 
+        {/* USER PROFILE */}
         <div className="user-profile">
-          {auth.currentUser?.photoURL && (
-            <img src={auth.currentUser.photoURL} alt="Profile" className="profile-pic" />
-          )}
+          <img src={auth.currentUser?.photoURL || "https://via.placeholder.com/50"} alt="Profile" className="profile-pic" />
           <div className="profile-info">
-            <span className="profile-name">{auth.currentUser?.displayName || "User"}</span>
-            <span className="profile-email">{auth.currentUser?.email}</span>
+            <span className="profile-name">{auth.currentUser?.displayName}</span>
           </div>
-          <button onClick={handleLogout} className="logout-btn">Logout</button>
+          <button onClick={handleLogout} className="ui-btn logout-btn">Logout</button>
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Active Chat Feed */}
+      {/* CHAT AREA */}
       <div className="main-chat-area">
-        <Chat room={room} />
+        {activeRoom ? (
+          <Chat activeRoom={activeRoom} />
+        ) : (
+          <div className="empty-chat-state">
+            <h2>Select or create a room to start chatting!</h2>
+          </div>
+        )}
       </div>
-
     </div>
   );
 }
