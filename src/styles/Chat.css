@@ -1,134 +1,20 @@
-.chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: #17212b; /* Slightly lighter navy for chat area */
-}
-
-/* Header */
+/* Add these to your Chat.css */
 .chat-header {
-  text-align: center;
-  padding: 20px;
-  border-bottom: 1px solid #233140;
-}
-
-.chat-header h1 {
-  color: #33a8ff;
-  font-size: 3rem;
-  margin: 0 0 10px 0;
-}
-
-.chat-header p {
-  color: #8a99a8;
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-/* Feed Container */
-.messages-feed {
-  flex: 1;
-  overflow-y: auto;
-  padding: 30px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 20px;
 }
-
-/* Centered Message Cards */
-.message-card {
-  background-color: #1d2733;
-  width: 100%;
-  max-width: 600px;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-}
-
-.message-avatar {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px; /* Square edges like the image */
-  object-fit: cover;
-  margin-bottom: 10px;
-}
-
-.message-avatar-fallback {
-  width: 60px;
-  height: 60px;
+.room-meta { font-size: 0.85rem; color: #7f8c8d; }
+.invite-badge {
+  background-color: #e74c3c;
+  padding: 8px 15px;
   border-radius: 8px;
-  background-color: #8e44ad;
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 10px;
+  font-size: 0.9rem;
 }
-
-.message-details {
-  margin-bottom: 10px;
-}
-
-.message-user {
-  font-weight: bold;
-  font-size: 1.1rem;
-  margin-right: 8px;
-}
-
-.message-time {
-  color: #33a8ff;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
-
-.message-text {
-  color: white;
-  font-size: 1rem;
-  margin: 0;
-}
-
-/* Input Form */
-.message-form {
-  padding: 20px;
-  display: flex;
-  justify-content: center;
+.participants-bar {
   background-color: #0e1621;
-}
-
-.message-input {
-  width: 100%;
-  max-width: 800px;
-  padding: 15px;
-  background-color: #4a4a4a;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-}
-
-.message-input::placeholder {
-  color: #a0a0a0;
-}
-
-.send-btn {
-  background-color: #33a8ff;
-  color: #000;
-  border: none;
-  padding: 0 30px;
-  margin-left: 15px;
-  border-radius: 8px;
-  font-weight: bold;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.send-btn:hover {
-  background-color: #2b8cd0;
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  color: #33a8ff;
+  border-bottom: 1px solid #1c2733;
 }
